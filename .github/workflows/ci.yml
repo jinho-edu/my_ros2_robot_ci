@@ -69,11 +69,11 @@ jobs:
           # 패키지(Packages) 쓰기 권한이 있는 토큰이어야 합니다.
           password: ${{ secrets.GITHUB_TOKEN }} 
 
-      # 📤 (선택) Docker 이미지 태그 및 GHCR에 푸시
-      - name: Push Docker image to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          # GHCR 표준 태그 형식 (ghcr.io/username/repo-name:tag)
-          IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository }}:latest"
-          docker tag ${{ env.IMAGE_NAME }}:latest $IMAGE_TAG
-          docker push $IMAGE_TAG
+      # # 📤 (선택) Docker 이미지 태그 및 GHCR에 푸시
+      # - name: Push Docker image to GHCR
+      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      #   run: |
+      #     # GHCR 표준 태그 형식 (ghcr.io/username/repo-name:tag)
+      #     IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository }}:latest"
+      #     docker tag ${{ env.IMAGE_NAME }}:latest $IMAGE_TAG
+      #     docker push $IMAGE_TAG
