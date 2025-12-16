@@ -1,0 +1,79 @@
+name: ROS 2 CI/CD Pipeline
+
+# 🚀 1. 이벤트 트리거 설정: main 브랜치에 코드가 푸시되거나 Pull Request가 열릴 때 실행
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# 🔑 2. 환경 변수 설정
+env:
+  # ROS 2 워크스페이스 경로
+  ROS_WS: /ros2_ws
+  # 생성할 Docker 이미지 이름
+  IMAGE_NAME: ${{ github.repository }} # 예: 'your-username/my_ros2_robot_ci'
+  # GitHub Container Registry (GHCR) 주소
+  REGISTRY: ghcr.io
+
+# 👷 3. 작업(Jobs) 정의
+jobs:
+  # 🏗️ 빌드 및 테스트 작업 정의
+  build_and_test:
+    # 실행 환경: Ubuntu 최신 버전 (x86 아키텍처)
+    runs-on: ubuntu-latest
+    
+    # 작업 단계 (Steps)
+    steps:
+      # ⬇️ 소스 코드 체크아웃
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 서브모듈(Submodules)이 있다면 함께 체크아웃합니다.
+          submodules: recursive
+
+      # 🐳 Docker 이미지 빌드
+      - name: Build ROS 2 Docker image
+        # Dockerfile을 사용하여 ROS 2 환경을 포함한 이미지를 빌드합니다.
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            -f docker/Dockerfile \
+            .
+
+      # 🧪 ROS 2 빌드 및 테스트 (Docker 내부에서 실행)
+      - name: Build and Test ROS 2 package (colcon)
+        # 빌드된 Docker 이미지를 사용하여 컨테이너를 실행하고, 그 안에서 빌드 및 테스트를 수행합니다.
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:${{ env.ROS_WS }}/src/${{ github.event.repository.name }} \
+            ${{ env.IMAGE_NAME }}:latest \
+            /bin/bash -c " \
+              source /opt/ros/humble/setup.bash && \
+              cd ${{ env.ROS_WS }} && \
+              # ROS 2 소스 코드를 복사한 후 colcon 빌드 실행
+              colcon build --packages-select my_publisher && \
+              # 간단한 테스트 실행 (예: colcon test 또는 unittest 실행)
+              echo '--- Simple Test Placeholder ---' && \
+              echo 'Build successful. Image is ready.' \
+            "
+
+      # 📦 (선택) GitHub Container Registry에 로그인
+      - name: Login to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GitHub Secrets에 저장된 Personal Access Token(PAT) 사용. 
+          # 패키지(Packages) 쓰기 권한이 있는 토큰이어야 합니다.
+          password: ${{ secrets.GITHUB_TOKEN }} 
+
+      # 📤 (선택) Docker 이미지 태그 및 GHCR에 푸시
+      - name: Push Docker image to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # GHCR 표준 태그 형식 (ghcr.io/username/repo-name:tag)
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ github.repository }}:latest"
+          docker tag ${{ env.IMAGE_NAME }}:latest $IMAGE_TAG
+          docker push $IMAGE_TAG
